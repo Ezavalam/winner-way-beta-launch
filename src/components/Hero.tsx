@@ -3,33 +3,65 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "./ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Hero = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate API call with timeout
-    setTimeout(() => {
+    if (!email || !email.includes('@')) {
+      toast({
+        title: "Please enter a valid email",
+        description: "We need your email to send you beta access.",
+        variant: "destructive",
+      });
       setIsLoading(false);
-      if (email && email.includes('@')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from("leads")
+        .insert([{ email, source: "beta-landing" }]);
+      
+      if (error) {
+        // Handle unique constraint violation
+        if (error.code === '23505') {
+          toast({
+            title: "You're already on our list!",
+            description: "This email is already registered for early access.",
+            duration: 5000,
+          });
+        } else {
+          console.error("Error saving email:", error);
+          toast({
+            title: "Something went wrong",
+            description: "Please try again later.",
+            variant: "destructive",
+          });
+        }
+      } else {
         toast({
           title: "Success!",
           description: "You're on the list for early access!",
           duration: 5000,
         });
         setEmail("");
-      } else {
-        toast({
-          title: "Please enter a valid email",
-          description: "We need your email to send you beta access.",
-          variant: "destructive",
-        });
       }
-    }, 1000);
+    } catch (error) {
+      console.error("Exception:", error);
+      toast({
+        title: "Something went wrong",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
